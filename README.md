@@ -2,6 +2,23 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+For this project I tried several approaches to choose PID hyper parameters,
+At start I read what is the best params to tune it manually with
+[Ziegler–Nichols](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+
+Then I implemented twiddle algorithm with predefined starting point, **PID**
+[0.1, 0, 2]
+
+after several minutes I realized that Integral component tends to zero and removed it from twiddle cycle to improve convergence speed.
+
+Also initial version of the algorithm used sum of errors and it caused many problems when the car
+got out of the track, so I started to optimize sum of speeds on the lap, which worked much better
+
+Early stopping helps to iterate faster
+
+After dozens of iterations of twiddle algorithm the best lap speed achieved with *kP=0.128, kI=0, kD=0.796*
+
+---
 
 ## Dependencies
 
