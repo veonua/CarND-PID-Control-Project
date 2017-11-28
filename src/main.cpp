@@ -2,23 +2,18 @@
 #include <iostream>
 #include "json.hpp"
 #include "PID.h"
-#include <math.h>
+#include "Utils.h"
 
 // for convenience
 using json = nlohmann::json;
-
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
 std::string hasData(std::string s) {
   auto found_null = s.find("null");
-  auto b1 = s.find_first_of("[");
-  auto b2 = s.find_last_of("]");
+  auto b1 = s.find_first_of('[');
+  auto b2 = s.find_last_of(']');
   if (found_null != std::string::npos) {
     return "";
   }
@@ -32,10 +27,11 @@ int main()
 {
   uWS::Hub h;
 
-  PID pid;
+  PID pid(0.128, 0, 1.5);//(.15,.0,2.0);
   // TODO: Initialize the pid variable.
+    long step;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid, &step](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -46,26 +42,31 @@ int main()
         auto j = json::parse(s);
         std::string event = j[0].get<std::string>();
         if (event == "telemetry") {
+            step ++;
           // j[1] is the data JSON object
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
-          /*
-          * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-          
+
+          pid.UpdateError(cte, speed);
+
+
+        if (pid.shouldRestart(cte)) {
+            pid.restart();
+            sendReset(ws);
+            step = 0;
+            return;
+        }
+          double steer_value = pid.TotalError();
+
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          //std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = 0.3;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
@@ -92,7 +93,7 @@ int main()
   });
 
   h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
-    std::cout << "Connected!!!" << std::endl;
+    //std::cout << "Connected!!!" << std::endl;
   });
 
   h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
@@ -112,3 +113,4 @@ int main()
   }
   h.run();
 }
+
